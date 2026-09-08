@@ -1,0 +1,47 @@
+name: Build Wired Desktop APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install Android tools
+        run: sdkmanager "platforms;android-35" "build-tools;34.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
+      - name: Test native terminal
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror app/src/main/cpp/terminal.cpp tests/terminal_test.cpp -o /tmp/terminal-test
+          /tmp/terminal-test
+      - name: Build signed debug APK and lint
+        run: gradle --no-daemon :app:assembleDebug :app:lintDebug
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wired-Desktop-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-lint
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
