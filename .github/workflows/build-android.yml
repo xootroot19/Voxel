@@ -1,0 +1,575 @@
+# Coloque este arquivo em .github/workflows/build-android.yml.
+# Autossuficiente: inclui o codigo-fonte de um PROTOTIPO, nao o jogo oficial.
+# GitHub > Actions > Andy Voxel - APK > Run workflow > Artifacts.
+# C++17 + JNI/Java; Android 7+ ARM; APK debug para instalacao de teste.
+# Validado localmente: YAML, scripts e nucleo C++. Build Android nao executado aqui.
+# Compatibilidade: https://developer.android.com/build/releases/agp-8-7-0-release-notes
+# NDK: https://developer.android.com/guide/practices/page-sizes
+
+name: Andy Voxel - APK
+'on':
+  workflow_dispatch: {}
+  push:
+    paths:
+    - .github/workflows/build-android.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+    - name: Configurar Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Configurar Android SDK
+      uses: android-actions/setup-android@v3
+    - name: Instalar SDK, NDK e CMake
+      shell: bash
+      run: |
+        set -euo pipefail
+        sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+    - name: Configurar Gradle 8.9
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: '8.9'
+        cache-disabled: true
+    - name: Gerar projeto completo C++ e Android
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/andy-voxel"
+        cd "$RUNNER_TEMP/andy-voxel"
+        mkdir -p '.'
+        cat > 'README.md' <<'ANDY_FILE_0'
+        # Andy — Mundo de Brinquedos (protótipo)
+
+        Jogo Android offline de blocos, em primeira pessoa, inspirado no quarto do
+        Andy de Toy Story e na exploração/construção de Minecraft. Você controla um
+        cowboy identificado como Woody no HUD, com manga xadrez amarela e mão em
+        blocos. A representação é simples: não existe modelo completo do personagem.
+
+        ## Como gerar o APK
+
+        1. Salve o YAML em `.github/workflows/build-android.yml` no seu repositório GitHub.
+        2. Na aba Actions, abra `Andy Voxel - APK` e clique em `Run workflow`.
+           O workflow também executa quando esse arquivo é enviado por push.
+        3. Ao finalizar, baixe `andy-voxel-apk` na seção Artifacts da execução.
+        4. Extraia o ZIP e instale `andy-voxel-debug.apk` em um celular Android ARM.
+
+        O YAML é autossuficiente: gera todos os fontes em uma pasta temporária do
+        runner. Não precisa de código prévio, Gradle Wrapper ou secrets. A execução
+        precisa de acesso aos serviços de dependências do Google, Maven e GitHub.
+        Também publica `andy-voxel-source`, com o projeto gerado para continuar o
+        desenvolvimento. Alterações feitas nesse ZIP não afetam o YAML; para futuras
+        versões, altere os fontes embutidos ou adote um projeto separado com checkout.
+
+        ## Controles
+
+        - Arraste o lado esquerdo para andar; o joystick usa o ponto inicial do toque.
+        - Arraste a área direita livre para olhar.
+        - PULAR: salto; QUEBRAR: remove o bloco na mira; COLOCAR: adiciona um bloco.
+        - BLOCO: alterna madeira, vermelho, azul, amarelo e verde. Alcance: 6 blocos.
+        - Alterações nos blocos são salvas automaticamente. A posição reinicia ao abrir.
+        - Para restaurar o cenário original, limpe os dados do aplicativo no Android.
+
+        ## O que está implementado
+
+        Mundo finito de 48 × 24 × 48 blocos; paredes azuis com nuvens; cama e colcha;
+        janela; mesa; cômoda; caixa de brinquedos; tapete; pista e bola colorida.
+        Móveis são grandes em relação ao jogador. Há gravidade, colisão, salto,
+        edição, cinco materiais, controles multitoque e salvamento local do mundo.
+        Renderização e lógica em C++17/OpenGL ES 1.1; Activity, ciclo de vida e
+        controles em Java, conectados por JNI. Faces internas não são renderizadas;
+        a malha é reenviada à GPU somente quando o mundo muda.
+
+        ## Limites e validação
+
+        É uma base jogável de escopo pequeno, não uma reprodução fiel do pacote
+        Minecraft Toy Story: não contém mapa oficial, texturas oficiais, personagens
+        animados, vozes, missões, crafting, inventário limitado ou multiplayer.
+        O visual usa geometria e cores procedurais. O personagem é representado pelo
+        HUD e braço em primeira pessoa. A fidelidade adicional exige produção de arte
+        e expansão de gameplay.
+
+        O núcleo C++ e a estrutura do YAML foram testados no ambiente de criação.
+        O build Android completo e a execução em aparelho não foram realizados aqui.
+        O workflow compila as duas ABIs, verifica assinatura e alinhamento do APK,
+        e falha se a biblioteca nativa de qualquer ABI estiver ausente.
+        Essas verificações de empacotamento não substituem testes em aparelho.
+
+        APK debug assinado automaticamente para testes, Android 7.0+ (API 24),
+        arm64-v8a e armeabi-v7a. Não é um pacote de publicação na Play Store.
+        A chave de debug é temporária no runner: builds seguintes podem exigir
+        desinstalar a versão anterior, o que remove o mundo salvo.
+
+        ## Ferramentas fixadas
+
+        AGP 8.7.3, Gradle 8.9, JDK 17, compile/target SDK 35, Build Tools 35.0.0,
+        NDK 28.2.13676358, CMake 3.22.1. NDK r28 gera bibliotecas alinhadas a 16 KB.
+
+        Referências técnicas:
+        - https://developer.android.com/build/releases/agp-8-7-0-release-notes
+        - https://developer.android.com/guide/practices/page-sizes
+        - https://github.com/android-actions/setup-android
+        - https://github.com/gradle/actions/tree/main/setup-gradle
+        - https://github.com/actions/upload-artifact
+
+        Para testar só a lógica no Linux: `g++ -std=c++17 -O2 core_test.cpp -o core-test`
+        e depois `./core-test`.
+        ANDY_FILE_0
+        mkdir -p 'app'
+        cat > 'app/build.gradle' <<'ANDY_FILE_1'
+        plugins { id 'com.android.application' }
+        android {
+            namespace 'com.andy.voxel'
+            compileSdk 35
+            buildToolsVersion '35.0.0'
+            ndkVersion '28.2.13676358'
+            defaultConfig {
+                applicationId 'com.andy.voxel'
+                minSdk 24
+                targetSdk 35
+                versionCode 1
+                versionName '0.1-prototype'
+                ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+                externalNativeBuild { cmake { cppFlags '-std=c++17 -O2 -Wall -Wextra' } }
+            }
+            externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }
+            compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+        }
+        ANDY_FILE_1
+        mkdir -p 'app/src/main'
+        cat > 'app/src/main/AndroidManifest.xml' <<'ANDY_FILE_2'
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-feature android:glEsVersion="0x00010001" android:required="true" />
+            <application android:label="Andy • Mundo de Brinquedos" android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" android:allowBackup="false" android:supportsRtl="true">
+                <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden">
+                    <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        ANDY_FILE_2
+        mkdir -p 'app/src/main/cpp'
+        cat > 'app/src/main/cpp/CMakeLists.txt' <<'ANDY_FILE_3'
+        cmake_minimum_required(VERSION 3.22.1)
+        project(andyvoxel LANGUAGES CXX)
+        add_library(andyvoxel SHARED game.cpp)
+        target_compile_features(andyvoxel PRIVATE cxx_std_17)
+        target_link_libraries(andyvoxel GLESv1_CM android log)
+        ANDY_FILE_3
+        mkdir -p 'app/src/main/cpp'
+        cat > 'app/src/main/cpp/game.cpp' <<'ANDY_FILE_4'
+        #include <algorithm>
+        #include <array>
+        #include <chrono>
+        #include <cmath>
+        #include <cstdint>
+        #include <cstdio>
+        #include <fstream>
+        #include <string>
+        #include <vector>
+        #ifndef ANDY_HOST_TEST
+        #include <jni.h>
+        #include <GLES/gl.h>
+        #endif
+
+        namespace game {
+        constexpr int W=48,H=24,D=48;
+        constexpr float PI=3.14159265359f;
+        using World=std::array<uint8_t,W*H*D>;
+        World world{};
+        float x=24,y=1.01f,z=36,yaw=0,pitch=0,velocity=0,mx=0,mz=0;
+        int selected=0;
+        bool grounded=false,loaded=false,dirty=true;
+        std::string savePath;
+        int index(int a,int b,int c) { return (b*D+c)*W+a; }
+        bool inside(int a,int b,int c) { return a>=0 && a<W && b>=0 && b<H && c>=0 && c<D; }
+        int get(int a,int b,int c) { return inside(a,b,c)?world[index(a,b,c)]:0; }
+        void set(int a,int b,int c,int v) { if(inside(a,b,c)) world[index(a,b,c)]=uint8_t(v); }
+        void box(int a,int b,int c,int ex,int ey,int ez,int v) {
+            for(int j=b;j<ey;j++) for(int k=c;k<ez;k++) for(int i=a;i<ex;i++) set(i,j,k,v);
+        }
+        void generate() {
+            world.fill(0);
+            box(0,0,0,W,1,D,1);
+            box(0,1,0,W,H,1,2); box(0,1,D-1,W,H,D,2);
+            box(0,1,0,1,H,D,2); box(W-1,1,0,W,H,D,2);
+            // Papel de parede azul com nuvens brancas em pixels.
+            for(int h=7;h<22;h+=7) for(int a=4;a<44;a+=10) {
+                box(a,h,0,a+6,h+2,1,3); box(a+2,h+2,0,a+4,h+3,1,3);
+                box(0,h,a,1,h+2,a+6,3); box(0,h+2,a+2,1,h+3,a+4,3);
+                box(47,h,a,48,h+2,a+6,3); box(47,h+2,a+2,48,h+3,a+4,3);
+                box(a,h,47,a+6,h+2,48,3);
+            }
+            box(0,1,0,W,2,1,3); box(0,1,47,W,2,48,3);
+            // Cama enorme: quatro pés, estrado, colcha azul e travesseiro.
+            for(int a:{4,15}) for(int c:{4,24}) box(a,1,c,a+2,6,c+2,4);
+            box(3,5,3,18,7,28,4); box(3,7,3,18,9,28,6);
+            box(4,9,4,17,10,9,3); box(3,5,2,18,14,4,4);
+            for(int a=5;a<17;a+=4) for(int c=12;c<27;c+=5) box(a,8,c,a+2,9,c+2,7);
+            // Mesa, cômoda com puxadores, janela e caixa de brinquedos.
+            for(int a:{32,43}) for(int c:{3,11}) box(a,1,c,a+2,12,c+2,4);
+            box(31,12,2,46,14,15,1);
+            box(36,1,21,46,11,31,4);
+            for(int h=3;h<11;h+=3) { box(35,h,22,36,h+1,30,1); box(34,h,25,35,h+1,27,7); }
+            box(22,10,0,34,20,1,3); box(23,11,0,33,19,1,9);
+            box(27,11,0,28,19,1,3); box(23,15,0,33,16,1,3);
+            box(3,1,35,15,6,44,5); box(4,2,36,14,6,43,0);
+            box(3,6,43,15,12,44,5);
+            // Tapete, cubos de montar, pista e bola amarela/vermelha/azul.
+            box(19,0,18,33,1,33,8);
+            for(int i=0;i<5;i++) box(20+i,1,12,21+i,2+i,15,5+i%4);
+            for(int a=18;a<33;a++) { set(a,1,40,4); set(a,1,43,4); }
+            for(int c=40;c<=43;c++) { set(18,1,c,4); set(32,1,c,4); }
+            for(int a=-3;a<=3;a++) for(int b=-3;b<=3;b++) for(int c=-3;c<=3;c++)
+                if(a*a+b*b+c*c<=10) set(28+a,4+b,25+c, b==0?5:(a>1?6:7));
+            dirty=true;
+        }
+        bool collides(float px,float py,float pz) {
+            if(px<1.25f || px>46.75f || pz<1.25f || pz>46.75f || py<1 || py+1.65f>H) return true;
+            for(int a=int(std::floor(px-.24f));a<=int(std::floor(px+.24f));a++)
+                for(int b=int(std::floor(py+.01f));b<=int(std::floor(py+1.64f));b++)
+                    for(int c=int(std::floor(pz-.24f));c<=int(std::floor(pz+.24f));c++)
+                        if(get(a,b,c)) return true;
+            return false;
+        }
+        void tick(float dt) {
+            dt=std::clamp(dt,0.f,.05f);
+            // Subpassos evitam atravessar blocos mesmo com quadros lentos.
+            for(int i=0;i<5;i++) {
+                float t=dt/5, angle=yaw*PI/180;
+                float nx=x+(std::cos(angle)*mx+std::sin(angle)*mz)*4*t;
+                float nz=z+(std::sin(angle)*mx-std::cos(angle)*mz)*4*t;
+                if(!collides(nx,y,z)) x=nx;
+                if(!collides(x,y,nz)) z=nz;
+                velocity-=18*t;
+                if(!collides(x,y+velocity*t,z)) { y+=velocity*t; grounded=false; }
+                else { grounded=velocity<0; velocity=0; }
+            }
+        }
+        void save() {
+            if(savePath.empty()) return;
+            std::string tmp=savePath+".tmp";
+            std::ofstream f(tmp,std::ios::binary);
+            f.write("AVX1",4); f.write(reinterpret_cast<const char*>(world.data()),world.size());
+            f.close(); if(f) std::rename(tmp.c_str(),savePath.c_str());
+        }
+        void load() {
+            World candidate{}; char magic[4]{};
+            std::ifstream f(savePath,std::ios::binary); f.read(magic,4);
+            f.read(reinterpret_cast<char*>(candidate.data()),candidate.size());
+            if(f && std::string(magic,4)=="AVX1" && std::all_of(candidate.begin(),candidate.end(),[](uint8_t v){return v<=9;})) world=candidate;
+            // Encontre espaço livre ao reabrir um mundo alterado.
+            if(collides(x,y,z)) for(int b=1;b<H-2;b++) for(int c=2;c<D-2;c++) for(int a=2;a<W-2;a++)
+                if(get(a,b-1,c) && !collides(a+.5f,float(b),c+.5f)) { x=a+.5f; y=float(b); z=c+.5f; return; }
+        }
+        void action(int code) {
+            if(code==0) { if(grounded) { velocity=7; grounded=false; } return; }
+            if(code==3) { selected=(selected+1)%5; return; }
+            float a=yaw*PI/180,b=pitch*PI/180;
+            float vx=std::sin(a)*std::cos(b),vy=-std::sin(b),vz=-std::cos(a)*std::cos(b);
+            int ox=int(x),oy=int(y+1.5f),oz=int(z);
+            for(float t=0;t<6;t+=.025f) {
+                int ax=int(std::floor(x+vx*t)),ay=int(std::floor(y+1.5f+vy*t)),az=int(std::floor(z+vz*t));
+                if(get(ax,ay,az)) {
+                    if(code==1 && ay>0 && ax>0 && az>0 && ax<W-1 && az<D-1) set(ax,ay,az,0);
+                    if(code==2 && inside(ox,oy,oz) && !get(ox,oy,oz)) {
+                        const int palette[]={1,5,6,7,8}; set(ox,oy,oz,palette[selected]);
+                        if(collides(x,y,z)) set(ox,oy,oz,0);
+                    }
+                    dirty=true; save(); return;
+                }
+                ox=ax; oy=ay; oz=az;
+            }
+        }
+        struct Vertex { float x,y,z,r,g,b; };
+        std::vector<Vertex> mesh;
+        void buildMesh() {
+            mesh.clear();
+            const float colors[][3]={{0,0,0},{.66f,.43f,.23f},{.34f,.63f,.89f},{.96f,.95f,.87f},{.36f,.18f,.09f},{.82f,.16f,.14f},{.15f,.34f,.77f},{.98f,.78f,.14f},{.26f,.62f,.32f},{.69f,.89f,.98f}};
+            const int neighbors[6][3]={{-1,0,0},{1,0,0},{0,-1,0},{0,1,0},{0,0,-1},{0,0,1}};
+            const int corners[6][4][3]={{{0,0,0},{0,0,1},{0,1,1},{0,1,0}},{{1,0,1},{1,0,0},{1,1,0},{1,1,1}},{{0,0,1},{0,0,0},{1,0,0},{1,0,1}},{{0,1,0},{0,1,1},{1,1,1},{1,1,0}},{{1,0,0},{0,0,0},{0,1,0},{1,1,0}},{{0,0,1},{1,0,1},{1,1,1},{0,1,1}}};
+            const float shades[]={.72f,.8f,.55f,1,.76f,.88f};
+            for(int b=0;b<H;b++) for(int c=0;c<D;c++) for(int a=0;a<W;a++) {
+                int v=get(a,b,c); if(!v) continue;
+                for(int face=0;face<6;face++) {
+                    auto n=neighbors[face]; if(get(a+n[0],b+n[1],c+n[2])) continue;
+                    float shade=shades[face]*(.93f+.07f*((a*13+b*7+c*3)%5)/4.f);
+                    for(int k:{0,1,2,0,2,3}) {
+                        auto q=corners[face][k];
+                        mesh.push_back({float(a+q[0]),float(b+q[1]),float(c+q[2]),colors[v][0]*shade,colors[v][1]*shade,colors[v][2]*shade});
+                    }
+                }
+            }
+            dirty=false;
+        }
+        #ifndef ANDY_HOST_TEST
+        GLuint buffer=0;
+        auto last=std::chrono::steady_clock::now();
+        void render() {
+            auto now=std::chrono::steady_clock::now();
+            tick(std::chrono::duration<float>(now-last).count()); last=now;
+            if(dirty) {
+                buildMesh(); glBindBuffer(GL_ARRAY_BUFFER,buffer);
+                glBufferData(GL_ARRAY_BUFFER,mesh.size()*sizeof(Vertex),mesh.data(),GL_STATIC_DRAW);
+            }
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+            glRotatef(pitch,1,0,0); glRotatef(yaw,0,1,0); glTranslatef(-x,-y-1.5f,-z);
+            glBindBuffer(GL_ARRAY_BUFFER,buffer);
+            glEnableClientState(GL_VERTEX_ARRAY); glEnableClientState(GL_COLOR_ARRAY);
+            glVertexPointer(3,GL_FLOAT,sizeof(Vertex),nullptr);
+            glColorPointer(3,GL_FLOAT,sizeof(Vertex),reinterpret_cast<void*>(3*sizeof(float)));
+            glDrawArrays(GL_TRIANGLES,0,static_cast<GLsizei>(mesh.size()));
+        }
+        #endif
+        }
+        #ifndef ANDY_HOST_TEST
+        extern "C" {
+        JNIEXPORT void JNICALL Java_com_andy_voxel_MainActivity_init(JNIEnv* env,jclass,jstring path) {
+            const char* p=env->GetStringUTFChars(path,nullptr); game::savePath=p; env->ReleaseStringUTFChars(path,p);
+            if(!game::loaded) { game::generate(); game::load(); game::loaded=true; }
+            glGenBuffers(1,&game::buffer); game::dirty=true;
+            glClearColor(.45f,.68f,.88f,1); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+            game::last=std::chrono::steady_clock::now();
+        }
+        JNIEXPORT void JNICALL Java_com_andy_voxel_MainActivity_resize(JNIEnv*,jclass,jint w,jint h) {
+            glViewport(0,0,w,h); glMatrixMode(GL_PROJECTION); glLoadIdentity();
+            float r=float(w)/std::max(1,int(h)); glFrustumf(-.07f*r,.07f*r,-.07f,.07f,.1f,110);
+        }
+        JNIEXPORT void JNICALL Java_com_andy_voxel_MainActivity_frame(JNIEnv*,jclass) { game::render(); }
+        JNIEXPORT void JNICALL Java_com_andy_voxel_MainActivity_move(JNIEnv*,jclass,jfloat a,jfloat b) { game::mx=a; game::mz=b; }
+        JNIEXPORT void JNICALL Java_com_andy_voxel_MainActivity_look(JNIEnv*,jclass,jfloat a,jfloat b) { game::yaw=std::fmod(game::yaw+a,360.f); game::pitch=std::clamp(game::pitch+b,-85.f,85.f); }
+        JNIEXPORT void JNICALL Java_com_andy_voxel_MainActivity_action(JNIEnv*,jclass,jint code) { game::action(code); }
+        JNIEXPORT void JNICALL Java_com_andy_voxel_MainActivity_save(JNIEnv*,jclass) { game::save(); }
+        }
+        #endif
+        ANDY_FILE_4
+        mkdir -p 'app/src/main/java/com/andy/voxel'
+        cat > 'app/src/main/java/com/andy/voxel/MainActivity.java' <<'ANDY_FILE_5'
+        package com.andy.voxel;
+
+        import android.app.Activity;
+        import android.os.Bundle;
+        import android.opengl.GLSurfaceView;
+        import android.view.*;
+        import android.graphics.*;
+        import java.util.HashMap;
+        import javax.microedition.khronos.opengles.GL10;
+        import javax.microedition.khronos.egl.EGLConfig;
+
+        public class MainActivity extends Activity {
+            static { System.loadLibrary("andyvoxel"); }
+            static native void init(String path);
+            static native void resize(int w, int h);
+            static native void frame();
+            static native void move(float x, float z);
+            static native void look(float x, float y);
+            static native void action(int code);
+            static native void save();
+            GLSurfaceView surface;
+            Controls controls;
+            @Override public void onCreate(Bundle state) {
+                super.onCreate(state);
+                getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                getWindow().getDecorView().setSystemUiVisibility(5894);
+                surface = new GLSurfaceView(this);
+                surface.setEGLContextClientVersion(1);
+                String path = getFilesDir().getAbsolutePath() + "/room.bin";
+                surface.setRenderer(new GLSurfaceView.Renderer() {
+                    public void onSurfaceCreated(GL10 gl, EGLConfig cfg) { init(path); }
+                    public void onSurfaceChanged(GL10 gl, int w, int h) { resize(w,h); }
+                    public void onDrawFrame(GL10 gl) { frame(); }
+                });
+                setContentView(surface);
+                controls = new Controls();
+                addContentView(controls,new ViewGroup.LayoutParams(-1,-1));
+            }
+            @Override protected void onPause() {
+                controls.reset();
+                surface.queueEvent(() -> { move(0,0); save(); });
+                surface.onPause(); super.onPause();
+            }
+            @Override protected void onResume() { super.onResume(); surface.onResume(); }
+            class Controls extends View {
+                Paint p = new Paint(3);
+                int joystick=-1, camera=-1, material=0;
+                float jx,jy,lx,ly,dx,dy;
+                String[] names={"Madeira","Vermelho","Azul","Amarelo","Verde"};
+                HashMap<Integer,Integer> held = new HashMap<>();
+                Controls() { super(MainActivity.this); setLayerType(View.LAYER_TYPE_SOFTWARE,null); }
+                float unit() { return Math.min(getWidth()/16f,getHeight()/9f); }
+                void reset() { joystick=camera=-1; dx=dy=0; held.clear(); invalidate(); }
+                void text(Canvas c,String s,float x,float y,float size) {
+                    p.setColor(Color.WHITE); p.setTextSize(size); p.setTextAlign(Paint.Align.CENTER); c.drawText(s,x,y,p);
+                }
+                protected void onDraw(Canvas c) {
+                    float u=unit(), w=getWidth(), h=getHeight();
+                    // Manga xadrez e mão do cowboy, desenhadas em blocos no primeiro plano.
+                    float sx=w*.73f, sy=h*.65f;
+                    p.setColor(0xFFF0C72D); c.drawRect(sx,sy+u*.6f,sx+u*1.1f,h,p);
+                    p.setColor(0xFFB76626);
+                    for(int i=0;i<5;i++) c.drawRect(sx,sy+u*(.8f+i*.45f),sx+u*1.1f,sy+u*(.86f+i*.45f),p);
+                    c.drawRect(sx+u*.4f,sy+u*.6f,sx+u*.47f,h,p);
+                    p.setColor(0xFFE9AF7E); c.drawRect(sx-u*.12f,sy,sx+u*1.15f,sy+u*.65f,p);
+                    p.setColor(0xBB162539); c.drawRoundRect(u*.25f,u*.2f,w-u*.25f,u*1.1f,u*.2f,u*.2f,p);
+                    text(c,"WOODY  |  Quarto do Andy  |  " + names[material],w/2,u*.8f,u*.34f);
+                    p.setColor(0x66334455); c.drawCircle(u*2,h-u*2,u*1.25f,p);
+                    p.setColor(0xAACED7E0); c.drawCircle(u*2+dx*u,h-u*2+dy*u,u*.45f,p);
+                    text(c,"MOVER",u*2,h-u*.45f,u*.25f);
+                    String[] labels={"PULAR","QUEBRAR","COLOCAR","BLOCO"};
+                    for(int i=0;i<4;i++) {
+                        float x=w-u*(1.15f+i*1.85f);
+                        p.setColor(0xCC263850); c.drawRoundRect(x-u*.85f,h-u*1.5f,x+u*.85f,h-u*.4f,u*.18f,u*.18f,p);
+                        text(c,labels[i],x,h-u*.82f,u*.23f);
+                    }
+                    p.setColor(Color.WHITE); p.setStrokeWidth(2); c.drawLine(w/2-9,h/2,w/2+9,h/2,p); c.drawLine(w/2,h/2-9,w/2,h/2+9,p);
+
+                }
+                public boolean onTouchEvent(MotionEvent e) {
+                    int a=e.getActionMasked(), ix=e.getActionIndex(), id=e.getPointerId(ix);
+                    float x=e.getX(ix), y=e.getY(ix), u=unit();
+                    if(a==MotionEvent.ACTION_CANCEL) { reset(); surface.queueEvent(()->move(0,0)); return true; }
+                    if(a==MotionEvent.ACTION_DOWN || a==MotionEvent.ACTION_POINTER_DOWN) {
+                        if(y>getHeight()-u*1.5f && y<getHeight()-u*.4f && x>getWidth()-u*7.6f) {
+                            int b=Math.round((getWidth()-u*1.15f-x)/(u*1.85f));
+                            if(b>=0 && b<4) { held.put(id,b); final int code=b; surface.queueEvent(()->action(code)); if(b==3) material=(material+1)%5; }
+                        } else if(x<getWidth()*.38f && joystick<0) { joystick=id; jx=x; jy=y; }
+                        else if(camera<0) { camera=id; lx=x; ly=y; }
+                    }
+                    if(a==MotionEvent.ACTION_MOVE) {
+                        for(int i=0;i<e.getPointerCount();i++) {
+                            int pid=e.getPointerId(i); float px=e.getX(i), py=e.getY(i);
+                            if(pid==joystick) {
+                                dx=(px-jx)/u; dy=(py-jy)/u;
+                                float len=(float)Math.hypot(dx,dy); if(len>1) { dx/=len; dy/=len; }
+                                final float mx=dx,mz=-dy; surface.queueEvent(()->move(mx,mz));
+                            } else if(pid==camera) {
+                                final float ax=(px-lx)/u*4, ay=(py-ly)/u*4;
+                                surface.queueEvent(()->look(ax,ay)); lx=px; ly=py;
+                            }
+                        }
+                    }
+                    if(a==MotionEvent.ACTION_UP || a==MotionEvent.ACTION_POINTER_UP) {
+                        if(id==joystick) { joystick=-1; dx=dy=0; surface.queueEvent(()->move(0,0)); }
+                        if(id==camera) camera=-1;
+                        held.remove(id); performClick();
+                    }
+                    invalidate(); return true;
+                }
+                @Override public boolean performClick() { super.performClick(); return true; }
+            }
+        }
+        ANDY_FILE_5
+        mkdir -p '.'
+        cat > 'build.gradle' <<'ANDY_FILE_6'
+        plugins { id 'com.android.application' version '8.7.3' apply false }
+        ANDY_FILE_6
+        mkdir -p '.'
+        cat > 'ccvGfCac.s' <<'ANDY_FILE_7'
+
+        ANDY_FILE_7
+        mkdir -p '.'
+        cat > 'core_test.cpp' <<'ANDY_FILE_8'
+        #define ANDY_HOST_TEST
+        #include "app/src/main/cpp/game.cpp"
+        #include <cassert>
+        #include <iostream>
+        int main() {
+            using namespace game;
+            generate();
+            assert(!collides(x,y,z));
+            assert(collides(0,1,20));
+            assert(collides(5,7,5));
+            for(int i=0;i<100;i++) tick(.016f);
+            assert(grounded && y>=1 && y<1.03f);
+            action(0);
+            float base=y;
+            for(int i=0;i<15;i++) tick(.016f);
+            assert(y>base+.5f);
+            for(int i=0;i<150;i++) tick(.016f);
+            assert(grounded && y<1.03f);
+            x=24; y=1.01f; z=36; yaw=0; pitch=0;
+            set(24,2,33,5);
+            action(2); assert(get(24,2,34)==1);
+            action(1); assert(get(24,2,34)==0);
+            action(1); assert(get(24,2,33)==0);
+            set(24,1,35,1); set(24,2,35,1);
+            mz=1;
+            for(int i=0;i<100;i++) tick(.05f);
+            assert(z>=36.24f || z==36); mz=0;
+            savePath="core-test-room.bin"; save(); World original=world;
+            world.fill(0); load(); assert(world==original);
+            std::remove(savePath.c_str());
+            buildMesh(); assert(!mesh.empty() && mesh.size()%6==0);
+            std::cout << "PASS: spawn, collision, jump, edit, save/load and mesh (" << mesh.size() << " vertices)\n";
+        }
+        ANDY_FILE_8
+        mkdir -p '.'
+        cat > 'gradle.properties' <<'ANDY_FILE_9'
+        org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
+        android.useAndroidX=false
+        ANDY_FILE_9
+        mkdir -p '.'
+        cat > 'settings.gradle' <<'ANDY_FILE_10'
+        pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+        dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+        rootProject.name = 'AndyVoxel'
+        include ':app'
+        ANDY_FILE_10
+    - name: Testar logica e compilar APK
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$RUNNER_TEMP/andy-voxel"
+        g++ -std=c++17 -O2 -Wall -Wextra -Werror core_test.cpp -o "$RUNNER_TEMP/andy-core-test"
+        "$RUNNER_TEMP/andy-core-test"
+        gradle --no-daemon --stacktrace --max-workers=2 :app:assembleDebug
+    - name: Verificar APK e empacotar fontes
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$RUNNER_TEMP/andy-voxel"
+        mkdir -p "$GITHUB_WORKSPACE/dist"
+        cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/dist/andy-voxel-debug.apk"
+        apk="$GITHUB_WORKSPACE/dist/andy-voxel-debug.apk"
+        "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+        "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 "$apk"
+        python3 - "$apk" <<'PY_CHECK'
+        import sys, zipfile
+        with zipfile.ZipFile(sys.argv[1]) as z:
+            for abi in ('arm64-v8a', 'armeabi-v7a'):
+                name = f'lib/{abi}/libandyvoxel.so'
+                assert name in z.namelist(), f'Biblioteca ausente: {name}'
+                assert z.getinfo(name).file_size > 0
+        print('APK: ambas as arquiteturas nativas presentes.')
+        PY_CHECK
+        zip -q -r "$GITHUB_WORKSPACE/dist/andy-voxel-source.zip" . -x '.gradle/*' 'app/build/*' 'app/.cxx/*' 'local.properties'
+        cd "$GITHUB_WORKSPACE/dist"
+        sha256sum andy-voxel-debug.apk > SHA256SUMS.txt
+        cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+        ## APK do protótipo pronto
+        Baixe **andy-voxel-apk** em Artifacts, extraia e instale o APK em Android 7.0+ ARM.
+        O projeto gerado está em **andy-voxel-source**.
+        Protótipo voxel em primeira pessoa inspirado no Woody no quarto do Andy.
+        Assinatura de debug temporária; uma nova execução pode exigir desinstalar a versão anterior.
+        SUMMARY
+    - name: Disponibilizar APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: andy-voxel-apk
+        path: |
+          dist/andy-voxel-debug.apk
+          dist/SHA256SUMS.txt
+        if-no-files-found: error
+        retention-days: 14
+    - name: Disponibilizar fontes
+      uses: actions/upload-artifact@v4
+      with:
+        name: andy-voxel-source
+        path: dist/andy-voxel-source.zip
+        if-no-files-found: error
+        retention-days: 14
